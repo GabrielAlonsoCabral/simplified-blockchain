@@ -1,4 +1,4 @@
-# rust-blockchain-example
+# rust-simplified-blockchain
 
 Simple example for building a blockchain in Rust
 
