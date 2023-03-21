@@ -52,7 +52,7 @@ impl BlockchainBehaviour {
         response_sender: mpsc::UnboundedSender<ChainResponse>,
         init_sender: mpsc::UnboundedSender<bool>,
     ) -> Self {
-        let mut behaviour = Self {
+        let mut behaviour: BlockchainBehaviour = Self {
             blockchain,
             floodsub: Floodsub::new(*PEER_ID),
             mdns: Mdns::new(Default::default())
@@ -122,7 +122,7 @@ impl NetworkBehaviourEventProcess<MdnsEvent> for BlockchainBehaviour {
 pub fn get_list_peers(swarm: &Swarm<BlockchainBehaviour>) -> Vec<String> {
     info!("Discovered Peers:");
     let nodes = swarm.behaviour().mdns.discovered_nodes();
-    let mut unique_peers = HashSet::new();
+    let mut unique_peers: HashSet<&PeerId> = HashSet::new();
     for peer in nodes {
         unique_peers.insert(peer);
     }
@@ -130,21 +130,21 @@ pub fn get_list_peers(swarm: &Swarm<BlockchainBehaviour>) -> Vec<String> {
 }
 
 pub fn handle_print_peers(swarm: &Swarm<BlockchainBehaviour>) {
-    let peers = get_list_peers(swarm);
+    let peers: Vec<String> = get_list_peers(swarm);
     peers.iter().for_each(|p| info!("{}", p));
 }
 
 pub fn handle_print_chain(swarm: &Swarm<BlockchainBehaviour>) {
     info!("Local Blockchain:");
-    let pretty_json = serde_json::to_string_pretty(&swarm.behaviour().blockchain.blocks)
+    let pretty_json: String = serde_json::to_string_pretty(&swarm.behaviour().blockchain.blocks)
         .expect("can jsonify blocks");
     info!("{}", pretty_json);
 }
 
 pub fn handle_create_block(cmd: &str, swarm: &mut Swarm<BlockchainBehaviour>) {
     if let Some(data) = cmd.strip_prefix("create b") {
-        let behaviour = swarm.behaviour_mut();
-        let latest_block = behaviour
+        let behaviour: &mut BlockchainBehaviour = swarm.behaviour_mut();
+        let latest_block: &Block = behaviour
             .blockchain
             .blocks
             .last()
@@ -154,7 +154,7 @@ pub fn handle_create_block(cmd: &str, swarm: &mut Swarm<BlockchainBehaviour>) {
             latest_block.hash.clone(),
             data.to_owned(),
         );
-        let json = serde_json::to_string(&block).expect("can jsonify request");
+        let json: String = serde_json::to_string(&block).expect("can jsonify request");
         behaviour.blockchain.blocks.push(block);
         info!("broadcasting new block");
         behaviour
