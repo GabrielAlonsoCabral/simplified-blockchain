@@ -1,7 +1,8 @@
 # rust-simplified-blockchain
 
-Simple example for building a blockchain in Rust
+  Simple example for building a blockchain in Rust
 
+  https://user-images.githubusercontent.com/77025415/226765487-3b2cba10-2b44-4745-9667-c0c2fe0953c4.mov
 
   Developed by: <a href="https://www.github.com/gabrielAlonsoCabral">@GabrielAlonsoCabral</a>  
  <br/>
