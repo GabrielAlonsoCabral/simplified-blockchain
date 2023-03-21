@@ -14,16 +14,14 @@ USAGE
 RUST_LOG=info cargo run
 ```
 
-This starts the client locally. The blockchain is not persisted anywhere.
+SCRIPTS
 
-You can start it in multiple terminals to get multiple connected peer-to-peer clients.
-
-In each client, you can enter the following commands:
-
+```
 * `ls p` - list peers
 * `ls c` - print local chain
 * `create b $data` - `$data` is just a string here - this creates (mines) a new block with the data entry `$data` and broadcasts it
 * `EXAMPLE $data: rust_blockchain > Peer Id: 12D3KooWSXGZJJEnh3tndGEVm6ACQ5pdaPKL34ktmCsUqkqSVTWX` 
+```
 
 Once a block is created by a node, it's broadcasted and the blockchain in all other nodes is updated (if it's a valid block).
 
@@ -31,4 +29,3 @@ On startup, a node asks another node on the network for their blockchain and, if
 
 
 This is a VERY overly simplified, offline-running, highly inefficient and insecure blockchain implementation.
-DO NOT USE THIS FOR PRODUCTION CASES!
