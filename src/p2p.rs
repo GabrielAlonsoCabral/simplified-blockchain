@@ -1,4 +1,5 @@
-use super::{Block, Blockchain};
+use crate::{block::Block, blockchain::Blockchain};
+
 use libp2p::{
     floodsub::{Floodsub, FloodsubEvent, Topic},
     identity,
