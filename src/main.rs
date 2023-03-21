@@ -1,5 +1,5 @@
-use chrono::Utc;
-use log::{error, warn};
+use chrono::{DateTime, Utc};
+use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 fn main() {
     println!("Hello, world!");
@@ -75,6 +75,39 @@ impl Blockchain {
         }
         true
     }
+
+    fn is_chain_valid(&self, chain: &[Block]) -> bool {
+        for i in 0..chain.len() {
+            if i == 0 {
+                continue;
+            }
+            let first: &Block = chain.get(i - 1).expect("has to exist");
+            let second: &Block = chain.get(i).expect("has to exist");
+            if !self.is_block_valid(second, first) {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn choose_chain(&mut self, local: Vec<Block>, remote: Vec<Block>) -> Vec<Block> {
+        let is_local_valid: bool = self.is_chain_valid(&local);
+        let is_remote_valid: bool = self.is_chain_valid(&remote);
+
+        if is_local_valid && is_remote_valid {
+            if local.len() >= remote.len() {
+                local
+            } else {
+                remote
+            }
+        } else if is_remote_valid && !is_local_valid {
+            remote
+        } else if !is_remote_valid && is_local_valid {
+            local
+        } else {
+            panic!("local and remote chains are both invalid");
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -85,4 +118,42 @@ pub struct Block {
     pub timestamp: i64,
     pub data: String,
     pub nonce: u64,
+}
+
+impl Block {
+    pub fn new(id: u64, previous_hash: String, data: String) -> Self {
+        let now: DateTime<Utc> = Utc::now();
+        let (nonce, hash) = mine_block(id, now.timestamp(), &previous_hash, &data);
+        Self {
+            id,
+            hash,
+            timestamp: now.timestamp(),
+            previous_hash,
+            data,
+            nonce,
+        }
+    }
+}
+
+fn mine_block(id: u64, timestamp: i64, previous_hash: &str, data: &str) -> (u64, String) {
+    info!("mining block...");
+    let mut nonce = 0;
+
+    loop {
+        if nonce % 100000 == 0 {
+            info!("nonce: {}", nonce);
+        }
+        let hash: [u8] = calculate_hash(id, timestamp, previous_hash, data, nonce);
+        let binary_hash: String = hash_to_binary_representation(&hash);
+        if binary_hash.starts_with(DIFFICULTY_PREFIX) {
+            info!(
+                "mined! nonce: {}, hash: {}, binary hash: {}",
+                nonce,
+                hex::encode(&hash),
+                binary_hash
+            );
+            return (nonce, hex::encode(hash));
+        }
+        nonce += 1;
+    }
 }
