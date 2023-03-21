@@ -2,7 +2,7 @@ use libp2p::{
     core::upgrade,
     futures::StreamExt,
     mplex,
-    noise::{Keypair, NoiseConfig, X25519Spec},
+    noise::{AuthenticKeypair, Keypair, NoiseConfig, X25519Spec},
     swarm::{Swarm, SwarmBuilder},
     tcp::TokioTcpConfig,
     Transport,
@@ -28,7 +28,7 @@ async fn main() {
     let (response_sender, mut response_rcv) = mpsc::unbounded_channel();
     let (init_sender, mut init_rcv) = mpsc::unbounded_channel();
 
-    let auth_keys = Keypair::<X25519Spec>::new()
+    let auth_keys: AuthenticKeypair<X25519Spec> = Keypair::<X25519Spec>::new()
         .into_authentic(&p2p::KEYS)
         .expect("can create auth keys");
 
@@ -38,7 +38,7 @@ async fn main() {
         .multiplex(mplex::MplexConfig::new())
         .boxed();
 
-    let behaviour = p2p::BlockchainBehaviour::new(
+    let behaviour: p2p::BlockchainBehaviour = p2p::BlockchainBehaviour::new(
         blockchain::Blockchain::new(),
         response_sender,
         init_sender.clone(),
@@ -68,7 +68,7 @@ async fn main() {
     });
 
     loop {
-        let evt = {
+        let evt: Option<p2p::EventType> = {
             select! {
                 line = stdin.next_line() => Some(p2p::EventType::Input(line.expect("can get line").expect("can read line from stdin"))),
                 response = response_rcv.recv() => {
@@ -87,7 +87,7 @@ async fn main() {
         if let Some(event) = evt {
             match event {
                 p2p::EventType::Init => {
-                    let peers = p2p::get_list_peers(&swarm);
+                    let peers: Vec<String> = p2p::get_list_peers(&swarm);
                     swarm.behaviour_mut().blockchain.genesis();
 
                     info!("connected nodes: {}", peers.len());
@@ -100,7 +100,8 @@ async fn main() {
                                 .to_string(),
                         };
 
-                        let json = serde_json::to_string(&req).expect("can jsonify request");
+                        let json: String =
+                            serde_json::to_string(&req).expect("can jsonify request");
                         swarm
                             .behaviour_mut()
                             .floodsub
@@ -108,7 +109,7 @@ async fn main() {
                     }
                 }
                 p2p::EventType::LocalChainResponse(resp) => {
-                    let json = serde_json::to_string(&resp).expect("can jsonify response");
+                    let json: String = serde_json::to_string(&resp).expect("can jsonify response");
                     swarm
                         .behaviour_mut()
                         .floodsub
