@@ -1,4 +1,4 @@
-use super::{App, Block};
+use super::{Block, Blockchain};
 use libp2p::{
     floodsub::{Floodsub, FloodsubEvent, Topic},
     identity,
@@ -35,7 +35,7 @@ pub enum EventType {
 }
 
 #[derive(NetworkBehaviour)]
-pub struct AppBehaviour {
+pub struct BlockchainBehaviour {
     pub floodsub: Floodsub,
     pub mdns: Mdns,
     #[behaviour(ignore)]
@@ -43,17 +43,17 @@ pub struct AppBehaviour {
     #[behaviour(ignore)]
     pub init_sender: mpsc::UnboundedSender<bool>,
     #[behaviour(ignore)]
-    pub app: App,
+    pub blockchain: Blockchain,
 }
 
-impl AppBehaviour {
+impl BlockchainBehaviour {
     pub async fn new(
-        app: App,
+        blockchain: Blockchain,
         response_sender: mpsc::UnboundedSender<ChainResponse>,
         init_sender: mpsc::UnboundedSender<bool>,
     ) -> Self {
         let mut behaviour = Self {
-            app,
+            blockchain,
             floodsub: Floodsub::new(*PEER_ID),
             mdns: Mdns::new(Default::default())
                 .await
@@ -69,7 +69,7 @@ impl AppBehaviour {
 }
 
 // incoming event handler
-impl NetworkBehaviourEventProcess<FloodsubEvent> for AppBehaviour {
+impl NetworkBehaviourEventProcess<FloodsubEvent> for BlockchainBehaviour {
     fn inject_event(&mut self, event: FloodsubEvent) {
         if let FloodsubEvent::Message(msg) = event {
             if let Ok(resp) = serde_json::from_slice::<ChainResponse>(&msg.data) {
@@ -77,14 +77,16 @@ impl NetworkBehaviourEventProcess<FloodsubEvent> for AppBehaviour {
                     info!("Response from {}:", msg.source);
                     resp.blocks.iter().for_each(|r| info!("{:?}", r));
 
-                    self.app.blocks = self.app.choose_chain(self.app.blocks.clone(), resp.blocks);
+                    self.blockchain.blocks = self
+                        .blockchain
+                        .choose_chain(self.blockchain.blocks.clone(), resp.blocks);
                 }
             } else if let Ok(resp) = serde_json::from_slice::<LocalChainRequest>(&msg.data) {
                 info!("sending local chain to {}", msg.source.to_string());
                 let peer_id = resp.from_peer_id;
                 if PEER_ID.to_string() == peer_id {
                     if let Err(e) = self.response_sender.send(ChainResponse {
-                        blocks: self.app.blocks.clone(),
+                        blocks: self.blockchain.blocks.clone(),
                         receiver: msg.source.to_string(),
                     }) {
                         error!("error sending response via channel, {}", e);
@@ -92,13 +94,13 @@ impl NetworkBehaviourEventProcess<FloodsubEvent> for AppBehaviour {
                 }
             } else if let Ok(block) = serde_json::from_slice::<Block>(&msg.data) {
                 info!("received new block from {}", msg.source.to_string());
-                self.app.try_add_block(block);
+                self.blockchain.try_add_block(block);
             }
         }
     }
 }
 
-impl NetworkBehaviourEventProcess<MdnsEvent> for AppBehaviour {
+impl NetworkBehaviourEventProcess<MdnsEvent> for BlockchainBehaviour {
     fn inject_event(&mut self, event: MdnsEvent) {
         match event {
             MdnsEvent::Discovered(discovered_list) => {
@@ -117,7 +119,7 @@ impl NetworkBehaviourEventProcess<MdnsEvent> for AppBehaviour {
     }
 }
 
-pub fn get_list_peers(swarm: &Swarm<AppBehaviour>) -> Vec<String> {
+pub fn get_list_peers(swarm: &Swarm<BlockchainBehaviour>) -> Vec<String> {
     info!("Discovered Peers:");
     let nodes = swarm.behaviour().mdns.discovered_nodes();
     let mut unique_peers = HashSet::new();
@@ -127,23 +129,23 @@ pub fn get_list_peers(swarm: &Swarm<AppBehaviour>) -> Vec<String> {
     unique_peers.iter().map(|p| p.to_string()).collect()
 }
 
-pub fn handle_print_peers(swarm: &Swarm<AppBehaviour>) {
+pub fn handle_print_peers(swarm: &Swarm<BlockchainBehaviour>) {
     let peers = get_list_peers(swarm);
     peers.iter().for_each(|p| info!("{}", p));
 }
 
-pub fn handle_print_chain(swarm: &Swarm<AppBehaviour>) {
+pub fn handle_print_chain(swarm: &Swarm<BlockchainBehaviour>) {
     info!("Local Blockchain:");
-    let pretty_json =
-        serde_json::to_string_pretty(&swarm.behaviour().app.blocks).expect("can jsonify blocks");
+    let pretty_json = serde_json::to_string_pretty(&swarm.behaviour().blockchain.blocks)
+        .expect("can jsonify blocks");
     info!("{}", pretty_json);
 }
 
-pub fn handle_create_block(cmd: &str, swarm: &mut Swarm<AppBehaviour>) {
+pub fn handle_create_block(cmd: &str, swarm: &mut Swarm<BlockchainBehaviour>) {
     if let Some(data) = cmd.strip_prefix("create b") {
         let behaviour = swarm.behaviour_mut();
         let latest_block = behaviour
-            .app
+            .blockchain
             .blocks
             .last()
             .expect("there is at least one block");
@@ -153,7 +155,7 @@ pub fn handle_create_block(cmd: &str, swarm: &mut Swarm<AppBehaviour>) {
             data.to_owned(),
         );
         let json = serde_json::to_string(&block).expect("can jsonify request");
-        behaviour.app.blocks.push(block);
+        behaviour.blockchain.blocks.push(block);
         info!("broadcasting new block");
         behaviour
             .floodsub

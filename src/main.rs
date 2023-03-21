@@ -24,7 +24,7 @@ const DIFFICULTY_PREFIX: &str = "00";
 
 mod p2p;
 
-pub struct App {
+pub struct Blockchain {
     pub blocks: Vec<Block>,
 }
 
@@ -97,7 +97,7 @@ fn hash_to_binary_representation(hash: &[u8]) -> String {
     res
 }
 
-impl App {
+impl Blockchain {
     fn new() -> Self {
         Self { blocks: vec![] }
     }
@@ -207,7 +207,9 @@ async fn main() {
         .multiplex(mplex::MplexConfig::new())
         .boxed();
 
-    let behaviour = p2p::AppBehaviour::new(App::new(), response_sender, init_sender.clone()).await;
+    let behaviour =
+        p2p::BlockchainBehaviour::new(Blockchain::new(), response_sender, init_sender.clone())
+            .await;
 
     let mut swarm = SwarmBuilder::new(transp, behaviour, *p2p::PEER_ID)
         .executor(Box::new(|fut| {
@@ -252,7 +254,7 @@ async fn main() {
             match event {
                 p2p::EventType::Init => {
                     let peers = p2p::get_list_peers(&swarm);
-                    swarm.behaviour_mut().app.genesis();
+                    swarm.behaviour_mut().blockchain.genesis();
 
                     info!("connected nodes: {}", peers.len());
                     if !peers.is_empty() {
